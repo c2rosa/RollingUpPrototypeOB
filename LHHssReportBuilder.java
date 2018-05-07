@@ -707,6 +707,15 @@ public class LHHssReportBuilder {
             rb.doAMCAnalysis();
         } else if(subroutineToRun.equals("DoAnalysisOfRuleSetOutputOfAggModel")) {
             rb.doAnalysisOfRuleSetOutputOfAggModel();
+        } else if(subroutineToRun.equals("consolidateMachineLearningResults")) {
+
+            String myInputSubdirectory = "C:\\\\Old Drive\\\\rosa.charles\\\\workspace_git\\\\RevMan_python_dataAnalysis\\\\data\\\\";
+            String myX_fileName = "XMatrix__False_283_2018_02_14.csv";
+            String myY_fileName = "YVector__False_283_2018_02_14.csv";
+            String myLeaf_fileName = "machineLearningModel_overAllSegModel__False_leafIDs_RandomForestRegressor_283_25_False_6.csv";
+
+
+            rb.consolidateMachineLearningResults(myInputSubdirectory, myX_fileName, myY_fileName, myLeaf_fileName);
         } else {
             throw new Exception("nothing run");
         }
@@ -748,6 +757,7 @@ public class LHHssReportBuilder {
             String dir_OptimOutput = myDirectoryString_OBModelPhaseII+runId+"\\in\\Output\\OptimOutput\\";
             File df_OptimOutput = new File(dir_OptimOutput);
             if (!df_OptimOutput.exists()) continue;
+
 
             String file_lane_diversion = dir_OptimOutput+"lho_lane_diversion.csv";
 
@@ -4644,6 +4654,235 @@ public class LHHssReportBuilder {
 
         int temp_a = 0;
 
+
+    }
+
+    public void consolidateMachineLearningResults(String myInputSubdirectory, String myX_fileName, String myY_fileName, String myLeaf_fileName) throws Exception {
+
+        List<String> XmatrixList = new ArrayList<>();
+        List<Double> YvectorList = new ArrayList<>();
+        List<Integer> leafIDList = new ArrayList<>();
+
+        System.out.println("reading X matrix");
+        String myXHeader = this.readXmatrix(myInputSubdirectory, myX_fileName, XmatrixList);
+        System.out.println("reading Y vector");
+        String myYHeader = this.readYVector(myInputSubdirectory, myY_fileName, YvectorList);
+        System.out.println("reading Leaf IDs");
+        this.readLeafIDVector(myInputSubdirectory, myLeaf_fileName, leafIDList);
+
+        SortedMap<Integer, FileWriter> myMapOfFileWriter = new TreeMap<Integer, FileWriter>();
+        SortedMap<Integer, PrintWriter> myMapOfPrintWriter = new TreeMap<Integer, PrintWriter>();
+
+        int myOffset = -1;
+        for(Integer myLeafID : leafIDList) {
+            myOffset++;
+            String myXmatrixString = XmatrixList.get(myOffset);
+            Double myCDI = YvectorList.get(myOffset);
+
+            FileWriter myFileWriter = myMapOfFileWriter.get(myLeafID);
+            if(myFileWriter==null) {
+                String myFileName = myInputSubdirectory+"ModelData_"+myLeafID+".csv";
+                myFileWriter = new FileWriter(myFileName, false);
+                myMapOfFileWriter.put(myLeafID,myFileWriter);
+            }
+
+            PrintWriter myPrintWriter = myMapOfPrintWriter.get(myLeafID);
+            if(myPrintWriter==null) {
+                myPrintWriter = new PrintWriter(myFileWriter);
+                myMapOfPrintWriter.put(myLeafID,myPrintWriter);
+                myPrintWriter.println(myXHeader+myYHeader);
+            }
+
+            myPrintWriter.println(myXmatrixString+myCDI);
+        }
+
+        for(Integer myLeafID : myMapOfPrintWriter.keySet()) {
+            PrintWriter myPrintWriter = myMapOfPrintWriter.get(myLeafID);
+            myPrintWriter.close();
+        }
+
+        for(Integer myLeafID : myMapOfFileWriter.keySet()) {
+            FileWriter myFileWriter = myMapOfFileWriter.get(myLeafID);
+            myFileWriter.close();
+        }
+
+    }
+
+    public void readLeafIDVector(String myInputSubdirectory, String myLeaf_fileName, List<Integer> leafIDList) throws Exception {
+
+        if(leafIDList==null) {
+            return;
+        }
+
+        BufferedReader br = null;
+        String dbRecord;
+
+        String myFileNameWithFullPath =  myInputSubdirectory+myLeaf_fileName;
+
+        try {
+            File f = new File(myFileNameWithFullPath);
+            FileInputStream fis = new FileInputStream(f);
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            br = new BufferedReader(new InputStreamReader(bis));
+            // read header line to get names of columns
+            dbRecord = br.readLine();
+
+            while ( (dbRecord = br.readLine()) != null) {
+
+                String[] myRecordValues = dbRecord.split(",");
+
+                Integer myLeafModelID = new Integer(myRecordValues[1]);
+
+                leafIDList.add(myLeafModelID);
+
+            }
+        }catch (IOException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException ioe) {
+                    System.out.println("IOException error trying to close the file: " +
+                            ioe.getMessage());
+                }
+            } // end if
+        } // end finally
+
+        return;
+
+    }
+
+    public String readYVector(String myInputSubdirectory, String myY_fileName, List<Double> YvectorList) throws Exception {
+
+        if(YvectorList==null) {
+            return null;
+        }
+
+        BufferedReader br = null;
+        String dbRecord;
+
+        String myHeader = null;
+
+        String myFileNameWithFullPath =  myInputSubdirectory+myY_fileName;
+
+        try {
+            File f = new File(myFileNameWithFullPath);
+            FileInputStream fis = new FileInputStream(f);
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            br = new BufferedReader(new InputStreamReader(bis));
+            // read header line to get names of columns
+            dbRecord = br.readLine();
+
+            Map<String, Integer> myMapOfOffsetByColumnName = new HashMap<String, Integer>();
+
+            String[] columnNames = dbRecord.split(",");
+
+            StringBuffer myHeaderBuffer = new StringBuffer();
+            for(int colOffset=0; colOffset<columnNames.length ; colOffset++) {
+                String currentColumnName = columnNames[colOffset];
+                myMapOfOffsetByColumnName.put(currentColumnName, colOffset);
+                if(colOffset>0) {
+                    myHeaderBuffer.append(currentColumnName+",");
+                }
+            }
+
+            myHeader = myHeaderBuffer.toString();
+
+            while ( (dbRecord = br.readLine()) != null) {
+
+                String[] myRecordValues = dbRecord.split(",");
+
+                Double myCDI = new Double(myRecordValues[1]);
+
+                YvectorList.add(myCDI);
+
+            }
+        }catch (IOException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException ioe) {
+                    System.out.println("IOException error trying to close the file: " +
+                            ioe.getMessage());
+                }
+            } // end if
+        } // end finally
+
+        return myHeader;
+
+    }
+
+    public String readXmatrix(String myInputSubdirectory, String myX_fileName, List<String> XmatrixList) throws Exception {
+
+        if(XmatrixList==null) {
+            return null;
+        }
+
+        BufferedReader br = null;
+        String dbRecord;
+
+        String myHeader = null;
+
+        String myFileNameWithFullPath =  myInputSubdirectory+myX_fileName;
+
+        try {
+            File f = new File(myFileNameWithFullPath);
+            FileInputStream fis = new FileInputStream(f);
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            br = new BufferedReader(new InputStreamReader(bis));
+            // read header line to get names of columns
+            dbRecord = br.readLine();
+
+            Map<String, Integer> myMapOfOffsetByColumnName = new HashMap<String, Integer>();
+
+            String[] columnNames = dbRecord.split(",");
+
+            StringBuffer myHeaderBuffer = new StringBuffer();
+            for(int colOffset=0; colOffset<columnNames.length ; colOffset++) {
+                String currentColumnName = columnNames[colOffset];
+                myMapOfOffsetByColumnName.put(currentColumnName, colOffset);
+                if(colOffset>0) {
+                    myHeaderBuffer.append(currentColumnName+",");
+                }
+            }
+
+            myHeader = myHeaderBuffer.toString();
+
+            while ( (dbRecord = br.readLine()) != null) {
+
+                String[] myRecordValues = dbRecord.split(",");
+
+                StringBuffer myBuffer = new StringBuffer();
+                for(int colOffset=0; colOffset<myRecordValues.length ; colOffset++) {
+                    String currentColumnValue = myRecordValues[colOffset];
+                    if(colOffset>0) {
+                        myBuffer.append(currentColumnValue+",");
+                    }
+                }
+
+                XmatrixList.add(myBuffer.toString());
+
+            }
+        }catch (IOException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException ioe) {
+                    System.out.println("IOException error trying to close the file: " +
+                            ioe.getMessage());
+                }
+            } // end if
+        } // end finally
+
+        return myHeader;
 
     }
 
