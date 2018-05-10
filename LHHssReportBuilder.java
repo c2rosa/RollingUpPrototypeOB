@@ -709,13 +709,13 @@ public class LHHssReportBuilder {
             rb.doAnalysisOfRuleSetOutputOfAggModel();
         } else if(subroutineToRun.equals("consolidateMachineLearningResults")) {
 
-            String myInputSubdirectory = "C:\\\\Old Drive\\\\rosa.charles\\\\workspace_git\\\\RevMan_python_dataAnalysis\\\\data\\\\";
-            String myX_fileName = "XMatrix__False_283_2018_02_14.csv";
-            String myY_fileName = "YVector__False_283_2018_02_14.csv";
-            String myLeaf_fileName = "machineLearningModel_overAllSegModel__False_leafIDs_RandomForestRegressor_283_25_False_6.csv";
+            String myInputSubdirectory = "C:\\\\Old Drive\\\\rosa.charles\\\\workspace_git\\\\RevMan_python_dataAnalysis\\\\data\\\\data_AMC_20180510_outputAndGeneratedInputForEricB\\\\";
+            String myX_fileName = "XMatrix__True_283_2018_02_14.csv";
+            String myY_fileName = "YVector__True_283_2018_02_14.csv";
+            String myLeaf_fileName = "machineLearningModel_overAllSegModel__True_leafIDs_RandomForestRegressor_283_25_False_4.csv";
 
-
-            rb.consolidateMachineLearningResults(myInputSubdirectory, myX_fileName, myY_fileName, myLeaf_fileName);
+            String delimiterForOutput = "\t";
+            rb.consolidateMachineLearningResults(myInputSubdirectory, myX_fileName, myY_fileName, myLeaf_fileName,delimiterForOutput);
         } else {
             throw new Exception("nothing run");
         }
@@ -4657,14 +4657,14 @@ public class LHHssReportBuilder {
 
     }
 
-    public void consolidateMachineLearningResults(String myInputSubdirectory, String myX_fileName, String myY_fileName, String myLeaf_fileName) throws Exception {
+    public void consolidateMachineLearningResults(String myInputSubdirectory, String myX_fileName, String myY_fileName, String myLeaf_fileName, String delimiterForOutput) throws Exception {
 
         List<String> XmatrixList = new ArrayList<>();
         List<Double> YvectorList = new ArrayList<>();
         List<Integer> leafIDList = new ArrayList<>();
 
         System.out.println("reading X matrix");
-        String myXHeader = this.readXmatrix(myInputSubdirectory, myX_fileName, XmatrixList);
+        String myXHeader = this.readXmatrix(myInputSubdirectory, myX_fileName, XmatrixList,delimiterForOutput);
         System.out.println("reading Y vector");
         String myYHeader = this.readYVector(myInputSubdirectory, myY_fileName, YvectorList);
         System.out.println("reading Leaf IDs");
@@ -4779,12 +4779,16 @@ public class LHHssReportBuilder {
 
             String[] columnNames = dbRecord.split(",");
 
+            if(columnNames.length>2) {
+                throw new Exception("myY_fileName="+myY_fileName+" should contain only two columns of values...and we only care about the 2nd column");
+            }
+
             StringBuffer myHeaderBuffer = new StringBuffer();
             for(int colOffset=0; colOffset<columnNames.length ; colOffset++) {
                 String currentColumnName = columnNames[colOffset];
                 myMapOfOffsetByColumnName.put(currentColumnName, colOffset);
                 if(colOffset>0) {
-                    myHeaderBuffer.append(currentColumnName+",");
+                    myHeaderBuffer.append(currentColumnName);
                 }
             }
 
@@ -4817,7 +4821,7 @@ public class LHHssReportBuilder {
 
     }
 
-    public String readXmatrix(String myInputSubdirectory, String myX_fileName, List<String> XmatrixList) throws Exception {
+    public String readXmatrix(String myInputSubdirectory, String myX_fileName, List<String> XmatrixList,String delimiterForOutput) throws Exception {
 
         if(XmatrixList==null) {
             return null;
@@ -4847,7 +4851,7 @@ public class LHHssReportBuilder {
                 String currentColumnName = columnNames[colOffset];
                 myMapOfOffsetByColumnName.put(currentColumnName, colOffset);
                 if(colOffset>0) {
-                    myHeaderBuffer.append(currentColumnName+",");
+                    myHeaderBuffer.append(currentColumnName+delimiterForOutput);
                 }
             }
 
@@ -4861,7 +4865,7 @@ public class LHHssReportBuilder {
                 for(int colOffset=0; colOffset<myRecordValues.length ; colOffset++) {
                     String currentColumnValue = myRecordValues[colOffset];
                     if(colOffset>0) {
-                        myBuffer.append(currentColumnValue+",");
+                        myBuffer.append(currentColumnValue+delimiterForOutput);
                     }
                 }
 
