@@ -4673,6 +4673,11 @@ public class LHHssReportBuilder {
         SortedMap<Integer, FileWriter> myMapOfFileWriter = new TreeMap<Integer, FileWriter>();
         SortedMap<Integer, PrintWriter> myMapOfPrintWriter = new TreeMap<Integer, PrintWriter>();
 
+        String mySuffix =".csv";
+        if(delimiterForOutput.equals("\t")) {
+            mySuffix = ".txt";
+        }
+
         int myOffset = -1;
         for(Integer myLeafID : leafIDList) {
             myOffset++;
@@ -4681,7 +4686,7 @@ public class LHHssReportBuilder {
 
             FileWriter myFileWriter = myMapOfFileWriter.get(myLeafID);
             if(myFileWriter==null) {
-                String myFileName = myInputSubdirectory+"ModelData_"+myLeafID+".csv";
+                String myFileName = myInputSubdirectory+"ModelData_"+myLeafID+mySuffix;
                 myFileWriter = new FileWriter(myFileName, false);
                 myMapOfFileWriter.put(myLeafID,myFileWriter);
             }
