@@ -709,10 +709,10 @@ public class LHHssReportBuilder {
             rb.doAnalysisOfRuleSetOutputOfAggModel();
         } else if(subroutineToRun.equals("consolidateMachineLearningResults")) {
 
-            String myInputSubdirectory = "C:\\\\Old Drive\\\\rosa.charles\\\\workspace_git\\\\RevMan_python_dataAnalysis\\\\data\\\\data_AMC_20180510_outputAndGeneratedInputForEricB\\\\";
+            String myInputSubdirectory = "C:\\Old Drive\\rosa.charles\\workspace_git\\RevMan_python_dataAnalysis\\data\\data_AMC_Tariff_20180514_outputAndGeneratedInput\\AMC\\updatedData_optExistingModel_20180515\\";
             String myX_fileName = "XMatrix__True_283_2018_02_14.csv";
             String myY_fileName = "YVector__True_283_2018_02_14.csv";
-            String myLeaf_fileName = "machineLearningModel_overAllSegModel__True_leafIDs_RandomForestRegressor_283_25_False_4.csv";
+            String myLeaf_fileName = "leafIds.csv";
 
             String delimiterForOutput = "\t";
             rb.consolidateMachineLearningResults(myInputSubdirectory, myX_fileName, myY_fileName, myLeaf_fileName,delimiterForOutput);
