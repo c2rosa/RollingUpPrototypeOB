@@ -716,6 +716,15 @@ public class LHHssReportBuilder {
 
             String delimiterForOutput = "\t";
             rb.consolidateMachineLearningResults(myInputSubdirectory, myX_fileName, myY_fileName, myLeaf_fileName,delimiterForOutput);
+        } else if(subroutineToRun.equals("rollUpMachineLearningLeafModelResultsResults")) {
+
+            String modelType = "AMC";
+            String myInputSubdirectory = "C:\\Old Drive\\rosa.charles\\workspace_git\\RevMan_python_dataAnalysis\\data\\data_AMC_Tariff_20180514_outputAndGeneratedInput\\"+modelType+"\\updatedData_optExistingModel_20180515\\ExpAmntOfSegSpecData_pGenLeaf\\";
+            String myFilePrefixToDetermineSegments = "leafOutputFile_fieldsConsidered_";
+            String myLeafModel_Results_output = "LeafModel_Results_AMC.csv";
+
+            String delimiterForOutput = "\t";
+            rb.rollUpMachineLearningLeafModelResultsResults(modelType, myInputSubdirectory, myFilePrefixToDetermineSegments, myLeafModel_Results_output);
         } else {
             throw new Exception("nothing run");
         }
@@ -4656,6 +4665,354 @@ public class LHHssReportBuilder {
 
 
     }
+
+    public void rollUpMachineLearningLeafModelResultsResults(String modelType, String myInputSubdirectory, String myFilePrefixToDetermineSegments, String myLeafModel_Results_output) throws Exception {
+
+        if(myFilePrefixToDetermineSegments == null) {
+            throw new Exception("myFilePrefixToDetermineSegments="+myFilePrefixToDetermineSegments+" is NOT set");
+        }
+
+        // does the subdirectory exist
+
+        File subdirectory = new File(myInputSubdirectory);
+        if(!subdirectory.exists()) {
+            throw new Exception("myInputSubdirectory="+myInputSubdirectory+" does not exist");
+        }
+
+        if(!subdirectory.isDirectory()) {
+            throw new Exception("myInputSubdirectory="+myInputSubdirectory+" is not a directory");
+        }
+
+        // find all of the segment numbers by searching across all files in myInputSubdirectory that begin with myFilePrefixToDetermineSegments
+
+        File[] directoryListing = subdirectory.listFiles();
+
+        if(directoryListing==null) {
+            throw new Exception("myInputSubdirectory="+myInputSubdirectory+" contains NO files");
+        }
+
+        Map<Integer, MeanVarStdDev_Metric> myMapOfStatsBySegment = new HashMap<>();
+        for (File fileWithinSubDirectory : directoryListing) {
+            if(fileWithinSubDirectory==null) {
+                continue;
+            }
+
+            String myFileName = fileWithinSubDirectory.getName();
+            // does this file have the appropriate prefix....
+            if(myFileName != null && myFileName.startsWith(myFilePrefixToDetermineSegments)) {
+                // read until the first digit character
+                Integer offsetOfFirstNumber = null;
+                for(int i=0; i<myFileName.length(); i++) {
+                    if(Character.isDigit(myFileName.charAt(i))) {
+                        offsetOfFirstNumber = i;
+                        break;
+                    }
+                }
+
+                if(offsetOfFirstNumber==null) {
+                    throw new Exception("myFileName="+myFileName+" has no digits");
+                }
+
+                String mySegmentNumberString = myFileName.substring(offsetOfFirstNumber);
+
+                Integer mySegmentNum = new Integer(mySegmentNumberString);
+
+                // read the file to get the mean, var, and stdDev
+                MeanVarStdDev_Metric myStats = this.readThisFileAndGetTheseStats(fileWithinSubDirectory);
+
+                if(myStats == null) {
+                    throw new Exception("myFileName="+myFileName+" has no MeanVarStdDev_Metric");
+                }
+
+                myMapOfStatsBySegment.put(mySegmentNum, myStats);
+            }
+        }
+
+        if(myMapOfStatsBySegment.size()==0) {
+            throw new Exception("myInputSubdirectory="+myInputSubdirectory+" contains no segment specific files with myFilePrefixToDetermineSegments="+myFilePrefixToDetermineSegments);
+        }
+
+        // we are now going to, for each segment, read the model results for that segment....and get those selected....
+
+        Map<Integer, SortedMap<Integer, ModelResults>> myMapofMapOfModelResultsByNumVarBySegment = new HashMap<>();
+        String myFileNameModelStatsPrefix = "leafOutputFile_modelStats_";
+        for(Integer mySegmentNum : myMapOfStatsBySegment.keySet()) {
+            SortedMap<Integer, ModelResults> myMap_inner = myMapofMapOfModelResultsByNumVarBySegment.get(mySegmentNum);
+            if(myMap_inner==null) {
+                myMap_inner = new TreeMap<Integer, ModelResults>();
+                myMapofMapOfModelResultsByNumVarBySegment.put(mySegmentNum, myMap_inner);
+            }
+            String myFileNameOfModelOutputStatsPrefixToMatch = myFileNameModelStatsPrefix+mySegmentNum;
+            // read through the model results file for this segment
+            for (File fileWithinSubDirectory : directoryListing) {
+                if (fileWithinSubDirectory == null) {
+                    continue;
+                }
+
+                String myFileName = fileWithinSubDirectory.getName();
+
+                // does this file have the appropriate prefix....
+                if (myFileName != null && myFileName.startsWith(myFileNameOfModelOutputStatsPrefixToMatch)) {
+                    String[] myRecordValues = myFileName.split("_");
+                    Integer myNumVar = new Integer(myRecordValues[3].trim());
+
+                    // read the file to get the mean, var, and stdDev
+                    ModelResults myModelResults = this.readModelResultsFile(fileWithinSubDirectory, myNumVar);
+
+                    if(myModelResults == null || myModelResults.getNumRMSError()==0) {
+                        Integer numRMSError = null;
+                        if(myModelResults != null) {
+                            numRMSError = myModelResults.getNumRMSError();
+                        }
+                        throw new Exception("myFileName="+myFileName+" has myModelResults="+myModelResults+" and numRMSError="+numRMSError);
+                    }
+
+                    myMap_inner.put(myNumVar, myModelResults);
+
+                }
+            }
+        }
+
+        int temp_a = 0;
+
+        // output the results into file....
+
+        FileWriter fstream = new FileWriter(myInputSubdirectory+myLeafModel_Results_output, false);
+        PrintWriter myPrintWriter = new PrintWriter(fstream);
+
+        StringBuffer header = new StringBuffer();
+        header.append("modelType"+",");
+        header.append("Segment"+",");
+        header.append("mean"+",");
+        header.append("variance"+",");
+        header.append("StdDev"+",");
+        header.append("PredictedMetric"+",");
+        header.append("numVariablesInModel"+",");
+        header.append("averageRMS"+",");
+        header.append("stdDevRMS"+",");
+        header.append("numCrossValidationsRMS"+",");
+
+        myPrintWriter.println(header);
+
+        for(Integer mySegmentNum : myMapOfStatsBySegment.keySet()) {
+            MeanVarStdDev_Metric myStat = myMapOfStatsBySegment.get(mySegmentNum);
+
+            StringBuffer buffer_segmentLevel = new StringBuffer();
+            buffer_segmentLevel.append(modelType+",");
+            buffer_segmentLevel.append(mySegmentNum+",");
+            buffer_segmentLevel.append(myStat.getMean()+",");
+            buffer_segmentLevel.append(myStat.getVariance()+",");
+            buffer_segmentLevel.append(myStat.getStdDev()+",");
+            buffer_segmentLevel.append(myStat.getNameOfMetric()+",");
+
+            Map<Integer, ModelResults> myMap_inner = myMapofMapOfModelResultsByNumVarBySegment.get(mySegmentNum);
+            if(myMap_inner==null) {
+                continue;
+            }
+            for (Integer numVar : myMap_inner.keySet()) {
+
+                ModelResults myModelResults = myMap_inner.get(numVar);
+
+                if(myModelResults==null) {
+                    continue;
+                }
+
+                StringBuffer buffer_modelLevel = new StringBuffer();
+                buffer_modelLevel.append(myModelResults.getNumPredictiveVars()+",");
+                buffer_modelLevel.append(myModelResults.getAvgRMSError()+",");
+                buffer_modelLevel.append(myModelResults.getStdDevRMSError()+",");
+                buffer_modelLevel.append(myModelResults.getNumRMSError()+",");
+
+                myPrintWriter.println(buffer_segmentLevel.toString()+buffer_modelLevel.toString());
+
+            }
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        myPrintWriter.close();
+        fstream.close();
+
+
+
+    }
+
+    public ModelResults readModelResultsFile(File fileWithinSubDirectory, int myNumPredictiveVar) throws Exception {
+
+        if(fileWithinSubDirectory==null) {
+            return null;
+        }
+
+        BufferedReader br = null;
+        String dbRecord;
+
+        ModelResults myReturnValue = new ModelResults(myNumPredictiveVar);
+
+        try {
+            FileInputStream fis = new FileInputStream(fileWithinSubDirectory);
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            br = new BufferedReader(new InputStreamReader(bis));
+
+            // read header line to get names of columns
+            dbRecord = br.readLine();
+
+            Map<String, Integer> myMapOfOffsetByColumnName = new HashMap<String, Integer>();
+
+            String[] columnNames = dbRecord.split(",");
+
+            for(int colOffset=0; colOffset<columnNames.length ; colOffset++) {
+                String currentColumnName = columnNames[colOffset];
+                myMapOfOffsetByColumnName.put(currentColumnName, colOffset);
+            }
+
+            // read just the first line after the header...and then jump out
+            while ( (dbRecord = br.readLine()) != null) {
+
+                String[] myRecordValues = dbRecord.split(",");
+
+                StringBuffer myBuffer = new StringBuffer();
+                for(int colOffset=0; colOffset<myRecordValues.length ; colOffset++) {
+                    String currentColumnName = columnNames[colOffset];
+                    String currentColumnValue = myRecordValues[colOffset].trim();
+                    if(currentColumnName != null && currentColumnName.startsWith("score")) {
+                        Double negMSE = new Double(currentColumnValue);
+                        Double posMSE = -negMSE;
+                        Double rms = Math.sqrt(posMSE);
+                        myReturnValue.addRMSError(rms);
+                    }
+                }
+
+            }
+
+
+        }catch (IOException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException ioe) {
+                    System.out.println("IOException error trying to close the file: " +
+                            ioe.getMessage());
+                }
+            } // end if
+        } // end finally
+
+        return myReturnValue;
+
+    }
+
+    public MeanVarStdDev_Metric readThisFileAndGetTheseStats(File fileWithinSubDirectory) throws Exception {
+
+        if(fileWithinSubDirectory==null) {
+            return null;
+        }
+
+        BufferedReader br = null;
+        String dbRecord;
+
+        MeanVarStdDev_Metric myReturnValue = null;
+
+        try {
+            FileInputStream fis = new FileInputStream(fileWithinSubDirectory);
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            br = new BufferedReader(new InputStreamReader(bis));
+
+            Double average = null;
+            Double stdDev = null;
+            Double variance = null;
+            String myMetric = null;
+
+            while ( (dbRecord = br.readLine()) != null) {
+
+                // read until you see the Average or StdDev or Var
+
+                String[] myRecordValues = dbRecord.split(" ");
+
+                String myKey = myRecordValues[0].trim();
+
+                if(myKey==null) {
+                    continue;
+                }
+
+                if(myKey.equals("Average")) {
+                    myMetric = myRecordValues[1].trim();
+                    String myValueString = null;
+                    Double myValue = null;
+                    try {
+                        myValueString = myRecordValues[2].trim();
+                        myValue = new Double(myValueString);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    average = myValue;
+                } else if(myKey.equals("StdDev")) {
+                    myMetric = myRecordValues[1].trim();
+                    String myValueString = null;
+                    Double myValue = null;
+                    try {
+                        myValueString = myRecordValues[2].trim();
+                        myValue = new Double(myValueString);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    stdDev = myValue;
+                } else if(myKey.equals("Var")) {
+                    myMetric = myRecordValues[1].trim();
+                    String myValueString = null;
+                    Double myValue = null;
+                    try {
+                        myValueString = myRecordValues[2].trim();
+                        myValue = new Double(myValueString);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    variance = myValue;
+                }
+            }
+
+            if(average != null && stdDev != null && variance != null && myMetric != null) {
+                myReturnValue = new MeanVarStdDev_Metric(
+                        average,
+                        variance,
+                        stdDev,
+                        myMetric
+                );
+            }
+        }catch (IOException e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException ioe) {
+                    System.out.println("IOException error trying to close the file: " +
+                            ioe.getMessage());
+                }
+            } // end if
+        } // end finally
+
+        return myReturnValue;
+
+    }
+
 
     public void consolidateMachineLearningResults(String myInputSubdirectory, String myX_fileName, String myY_fileName, String myLeaf_fileName, String delimiterForOutput) throws Exception {
 
