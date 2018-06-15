@@ -4783,14 +4783,16 @@ public class LHHssReportBuilder {
         StringBuffer header = new StringBuffer();
         header.append("modelType"+",");
         header.append("Segment"+",");
-        header.append("mean"+",");
-        header.append("variance"+",");
-        header.append("StdDev"+",");
+        header.append("segment data overall mean"+",");
+        header.append("segment data overall StdDev"+",");
         header.append("PredictedMetric"+",");
         header.append("numVariablesInModel"+",");
         header.append("averageRMS"+",");
         header.append("stdDevRMS"+",");
+        header.append("averageRMS_withoutBest"+",");
+        header.append("stdDevRMS_withoutBest"+",");
         header.append("numCrossValidationsRMS"+",");
+        header.append("winning model (true/false)"+",");
 
         myPrintWriter.println(header);
 
@@ -4801,14 +4803,44 @@ public class LHHssReportBuilder {
             buffer_segmentLevel.append(modelType+",");
             buffer_segmentLevel.append(mySegmentNum+",");
             buffer_segmentLevel.append(myStat.getMean()+",");
-            buffer_segmentLevel.append(myStat.getVariance()+",");
             buffer_segmentLevel.append(myStat.getStdDev()+",");
             buffer_segmentLevel.append(myStat.getNameOfMetric()+",");
 
-            Map<Integer, ModelResults> myMap_inner = myMapofMapOfModelResultsByNumVarBySegment.get(mySegmentNum);
+            SortedMap<Integer, ModelResults> myMap_inner = myMapofMapOfModelResultsByNumVarBySegment.get(mySegmentNum);
             if(myMap_inner==null) {
                 continue;
             }
+
+            Double bestAvgRMSError = null;
+            Integer numVar_bestModel = null;
+            int counter = 0;
+            for (Integer numVar : myMap_inner.keySet()) {
+                counter++;
+                boolean isThisBiggestNumVar = false;
+                if(counter==myMap_inner.size()) {
+                    isThisBiggestNumVar = true;
+                }
+
+                ModelResults myModelResults = myMap_inner.get(numVar);
+
+                if(myModelResults==null) {
+                    continue;
+                }
+
+                Double currentRMSError = myModelResults.getAvgRMSError_excludingBest();
+
+                if(bestAvgRMSError==null) {
+                    bestAvgRMSError = currentRMSError;
+                    numVar_bestModel = numVar;
+                } else {
+                    if(currentRMSError < bestAvgRMSError && !isThisBiggestNumVar) {
+                        bestAvgRMSError = currentRMSError;
+                        numVar_bestModel = numVar;
+                    }
+                }
+
+            }
+
             for (Integer numVar : myMap_inner.keySet()) {
 
                 ModelResults myModelResults = myMap_inner.get(numVar);
@@ -4821,7 +4853,10 @@ public class LHHssReportBuilder {
                 buffer_modelLevel.append(myModelResults.getNumPredictiveVars()+",");
                 buffer_modelLevel.append(myModelResults.getAvgRMSError()+",");
                 buffer_modelLevel.append(myModelResults.getStdDevRMSError()+",");
+                buffer_modelLevel.append(myModelResults.getAvgRMSError_excludingBest()+",");
+                buffer_modelLevel.append(myModelResults.getStdDevRMSError_excludingBest()+",");
                 buffer_modelLevel.append(myModelResults.getNumRMSError()+",");
+                buffer_modelLevel.append(numVar.equals(numVar_bestModel)+",");
 
                 myPrintWriter.println(buffer_segmentLevel.toString()+buffer_modelLevel.toString());
 
