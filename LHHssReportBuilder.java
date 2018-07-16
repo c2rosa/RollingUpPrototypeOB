@@ -718,10 +718,10 @@ public class LHHssReportBuilder {
             rb.consolidateMachineLearningResults(myInputSubdirectory, myX_fileName, myY_fileName, myLeaf_fileName,delimiterForOutput);
         } else if(subroutineToRun.equals("rollUpMachineLearningLeafModelResultsResults")) {
 
-            String modelType = "Tariff";
-            String myInputSubdirectory = "C:\\Old Drive\\rosa.charles\\workspace_git\\RevMan_python_dataAnalysis\\data\\data_AMC_Tariff_20180514_outputAndGeneratedInput\\Tariff\\updatedData_optExistingModel_20180515\\ExpAmntOfSegSpecData_mods\\";
+            String modelType = "AMC";
+            String myInputSubdirectory = "C:\\Old Drive\\rosa.charles\\workspace_git\\RevMan_python_dataAnalysis\\data\\data_AMC_Tariff_20180514_outputAndGeneratedInput\\AMC\\updatedData_optExistingModel_20180702\\ExpAmntOfSegSpecData_mods\\";
             String myFilePrefixToDetermineSegments = "leafOutputFile_fieldsConsidered_";
-            String myLeafModel_Results_output = "LeafModel_Results_Tariff.csv";
+            String myLeafModel_Results_output = "LeafModel_Results_AMC.csv";
 
             String delimiterForOutput = "\t";
             rb.rollUpMachineLearningLeafModelResultsResults(modelType, myInputSubdirectory, myFilePrefixToDetermineSegments, myLeafModel_Results_output);
